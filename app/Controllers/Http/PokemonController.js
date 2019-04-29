@@ -1,4 +1,4 @@
-'use strict'
+"use strict";
 
 /** @typedef {import('@adonisjs/framework/src/Request')} Request */
 /** @typedef {import('@adonisjs/framework/src/Response')} Response */
@@ -7,12 +7,13 @@
 /**
  * Resourceful controller for interacting with pokemons
  */
-const Database = use('Database')
+const Database = use("Database");
+const Helpers = use("Helpers");
 
-const Pokemon = use('App/Models/Pokemon')
-const Type = use('App/Models/Type')
-const TypeList = use('App/Models/TypeList')
-const Category = use('App/Models/Category')
+const Pokemon = use("App/Models/Pokemon");
+const Type = use("App/Models/Type");
+const TypeList = use("App/Models/TypeList");
+const Category = use("App/Models/Category");
 
 class PokemonController {
   /**
@@ -24,33 +25,30 @@ class PokemonController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async index ({ request, response, view }) {
+  async index({ request, response, view }) {
+    const pokemons = await Pokemon.query().paginate(2);
+    let promises = pokemons.toJSON().data.map(async pokemon => {
+      const types = await Database.select("type_lists.id", "type_lists.name")
+        .from("type_lists")
+        .leftJoin("types", "type_lists.id", "types.type_id")
+        .leftJoin("pokemons", "pokemons.id", "types.pokemon_id")
+        .where("pokemons.id", pokemon.id);
 
-  const pokemons = await Pokemon.all()
+      let pk = await Pokemon.find(pokemon.id);
+      let pokemon_category = await pk.category().fetch();
 
-  let promises = pokemons.toJSON().map(async pokemon => {
-    
-    const types = await Database.select('type_lists.id', 'type_lists.name').from('type_lists')
-                          .leftJoin('types', 'type_lists.id', 'types.type_id')
-                          .leftJoin('pokemons', 'pokemons.id', 'types.pokemon_id')
-                          .where('pokemons.id', pokemon.id)
-  
-    let pk = await Pokemon.find(pokemon.id)
-    let pokemon_category = await pk.category().fetch()
+      return {
+        ...pokemon,
+        type: types,
+        category: pokemon_category
+      };
+    });
 
-    return {
-      ...pokemon,
-      type: types,
-      category: pokemon_category
-    }
-  })
+    const data = await Promise.all(promises);
 
-  const data = await Promise.all(promises)
-
-  return response.json({
-    data
-  })
-
+    return response.json({
+      data
+    });
   }
 
   /**
@@ -61,70 +59,85 @@ class PokemonController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ auth, request, response }) {
-
+  async store({ auth, request, response }) {
     try {
       const { name, category, type } = request.post();
       const user = await auth.getUser();
       //insert new pokemon
       const pokemon = new Pokemon();
 
-      pokemon.name = name
+      pokemon.name = name;
 
       //fetch image from post request
-      const image = request.file('image', {
-        types: ['image'],
-        size: '2mb'
+      const image = request.file("image", {
+        types: ["image"],
+        size: "2mb"
       });
 
       //generate unique name for image
       const uniqueTime = new Date().getTime();
-      const fileNameToStore = `${uniqueTime}_pokemon_${pokemon.id}_${user.id}.jpg`;
+      const fileNameToStore = `${uniqueTime}_pokemon_${name}_${user.id}.jpg`;
 
       //move image to 'public/uploads/pokemons' directory
-      /*await image.move(Helpers.publicPath('uploads/pokemons'), {
+      await image.move(Helpers.publicPath("uploads/pokemons"), {
         name: fileNameToStore,
         overwrite: true
       });
 
       if (!image.moved()) {
         console.log(image.error());
-      }*/
-
-      pokemon.image_url = fileNameToStore
-
-      //find pokemon category or fail 
-      const pokemon_category = await Category.findBy('name', category)
-      //if category doesn't exist
-      if(!pokemon_category) {
-        const new_pokemon_category = await Category.create({name: category.name})
-
-        pokemon.category_id = new_pokemon_category.id
-      } else {
-        pokemon.category_id = pokemon_category.id
       }
 
-      await pokemon.save()
+      pokemon.image_url = fileNameToStore;
 
-      const find_pokemon_type = await TypeList.query().where('id', type).fetch()
+      //find pokemon category
+      const pokemon_category = await Category.findBy("name", category);
+      //if category doesn't exist
+      if (!pokemon_category) {
+        const new_pokemon_category = await Category.create({
+          name: category
+        });
 
-      const pokemon_type = await Type.create({pokemon_id: pokemon.id, type_id: find_pokemon_type.id}) 
+        pokemon.category_id = new_pokemon_category.id;
+      } else {
+        pokemon.category_id = pokemon_category.id;
+      }
 
+      await pokemon.save();
+
+      let type_promises = type.map(async t => {
+        const find_type = await TypeList.find(t);
+
+        const created_type = await Type.create({
+          pokemon_id: pokemon.id,
+          type_id: find_type.id
+        });
+
+        return find_type;
+      });
+
+      const type_resolved = await Promise.all(type_promises);
+
+      /*     const pokemon_type = await Type.create({
+        pokemon_id: pokemon.id,
+        type_id: find_pokemon_type.id
+      });
+      console.log(find_pokemon_type.id);
+*/
+      const pokemon_category_to_send = await pokemon.category().fetch();
       const data = {
         ...pokemon.toJSON(),
-        type: find_pokemon_type.toJSON(),
-        category: pokemon_category.toJSON()
-      }
+        type: type_resolved,
+        category: pokemon_category_to_send.toJSON()
+      };
 
       return response.json({
         data
-      })
-
+      });
     } catch (err) {
       throw err;
     }
   }
-
 
   /**
    * Display a single pokemon.
@@ -135,21 +148,21 @@ class PokemonController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async show ({ params, request, response}) {
-    
+  async show({ params, request, response }) {
     try {
-      const pokemon = await Pokemon.find(params.id)
+      const pokemon = await Pokemon.find(params.id);
       // const types = await Type.query().where('pokemon_id', pokemon.id).fetch()
-      const pokemon_category = await pokemon.category().fetch()
+      const pokemon_category = await pokemon.category().fetch();
 
-      const types = await Database.select('type_lists.id', 'type_lists.name').from('type_lists')
-                          .leftJoin('types', 'type_lists.id', 'types.type_id')
-                          .leftJoin('pokemons', 'pokemons.id', 'types.pokemon_id')
-                          .where('pokemons.id', params.id)
+      const types = await Database.select("type_lists.id", "type_lists.name")
+        .from("type_lists")
+        .leftJoin("types", "type_lists.id", "types.type_id")
+        .leftJoin("pokemons", "pokemons.id", "types.pokemon_id")
+        .where("pokemons.id", params.id);
 
-      let pokemon_types = []
+      let pokemon_types = [];
 
-      types.map(type => pokemon_types.push(type))
+      types.map(type => pokemon_types.push(type));
 
       let data = {
         ...pokemon.toJSON(),
@@ -158,16 +171,15 @@ class PokemonController {
           name: pokemon_category.name
         },
         type: pokemon_types
-      }
+      };
 
       return response.json({
-        message: 'beep',
+        message: "beep",
         data
-      })
-      
-      } catch(err) {
-        throw err
-      }
+      });
+    } catch (err) {
+      throw err;
+    }
   }
   /**
    * Update pokemon details.
@@ -177,8 +189,7 @@ class PokemonController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
-  }
+  async update({ params, request, response }) {}
 
   /**
    * Delete a pokemon with id.
@@ -188,65 +199,67 @@ class PokemonController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async destroy ({ params, request, response }) {
-  }
+  async destroy({ params, request, response }) {}
 
-  async searchPokemon ({params, request, response}) {
-    const fields = [ 'pokemons.id', 'pokemons.name', 'pokemons.image_url', 'category_id'];
+  async searchPokemon({ params, request, response }) {
+    const fields = [
+      "pokemons.id",
+      "pokemons.name",
+      "pokemons.image_url",
+      "category_id"
+    ];
 
-    const pokemons = await Database.select(fields).from('pokemons')
-                        .leftJoin('categories', 'pokemons.category_id', 'categories.id')
-                        .leftJoin('types', 'types.pokemon_id', 'pokemons.id')
-                        .leftJoin('type_lists', 'type_lists.id', 'types.type_id')
-                        .where('pokemons.name', 'LIKE', `%${params.q}%`)
-                        .orWhere('type_lists.name', 'LIKE', `%${params.q}%`)
-                        .orWhere('categories.name', 'LIKE', `%${params.q}%`)
+    const pokemons = await Database.select(fields)
+      .from("pokemons")
+      .leftJoin("categories", "pokemons.category_id", "categories.id")
+      .leftJoin("types", "types.pokemon_id", "pokemons.id")
+      .leftJoin("type_lists", "type_lists.id", "types.type_id")
+      .where("pokemons.name", "LIKE", `%${params.q}%`)
+      .orWhere("type_lists.name", "LIKE", `%${params.q}%`)
+      .orWhere("categories.name", "LIKE", `%${params.q}%`);
 
-    if(pokemons.length > 0) {
+    if (pokemons.length > 0) {
       let promises = pokemons.map(async pokemon => {
-    
-      const types = await Database.select('type_lists.id', 'type_lists.name').from('type_lists')
-                            .leftJoin('types', 'type_lists.id', 'types.type_id')
-                            .leftJoin('pokemons', 'pokemons.id', 'types.pokemon_id')
-                            .where('pokemons.id', pokemon.id)
-    
-      let pk = await Pokemon.find(pokemon.id)
-      let pokemon_category = await pk.category().fetch()
+        const types = await Database.select("type_lists.id", "type_lists.name")
+          .from("type_lists")
+          .leftJoin("types", "type_lists.id", "types.type_id")
+          .leftJoin("pokemons", "pokemons.id", "types.pokemon_id")
+          .where("pokemons.id", pokemon.id);
 
-      return {
-        ...pokemon,
-        type: types,
-        category: pokemon_category
-      }
+        let pk = await Pokemon.find(pokemon.id);
+        let pokemon_category = await pk.category().fetch();
 
-
-    })
-      const data = await Promise.all(promises)
+        return {
+          ...pokemon,
+          type: types,
+          category: pokemon_category
+        };
+      });
+      const data = await Promise.all(promises);
 
       return response.json({
-        message: 'search success',
+        message: "search success",
         data
-      })
-
+      });
     } else {
       return response.json({
-        message: 'item not found'
-      })
+        message: "item not found"
+      });
     }
   }
 
   async test({ params, request, response }) {
-    const { category } = request.post()
+    const { category } = request.post();
 
-    let test = await Category.findBy('name', category)
-    if(!test) {
-      return 'awkwkwwk'
+    let test = await Category.findBy("name", category);
+    if (!test) {
+      return "awkwkwwk";
     } else {
-      return ':>'
+      return ":>";
     }
 
-    return response.send(test)
+    return response.send(test);
   }
 }
 
-module.exports = PokemonController
+module.exports = PokemonController;
