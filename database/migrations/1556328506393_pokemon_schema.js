@@ -9,7 +9,7 @@ class PokemonSchema extends Schema {
       table.increments()
       table.string('name')
       table.string('image_url')
-      table.integer('category_id').unsigned().references('id').inTable('categories')
+      table.integer('category_id').unsigned().references('id').inTable('categories').onDelete('cascade').onUpdate('cascade')
       table.integer('user_id').unsigned().references('id').inTable('users')
       table.timestamps()
     })

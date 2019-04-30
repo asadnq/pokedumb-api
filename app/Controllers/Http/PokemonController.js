@@ -26,7 +26,7 @@ class PokemonController {
    * @param {View} ctx.view
    */
   async index({ request, response, view }) {
-    const pokemons = await Pokemon.query().paginate(2);
+    const pokemons = await Pokemon.query().paginate(1, 10);
     let promises = pokemons.toJSON().data.map(async pokemon => {
       const types = await Database.select("type_lists.id", "type_lists.name")
         .from("type_lists")
@@ -105,9 +105,9 @@ class PokemonController {
 
       await pokemon.save();
 
-      let type_promises = type.map(async t => {
-        const find_type = await TypeList.find(t);
-
+      const parsedType = JSON.parse(type);
+      let type_promises = parsedType.map(async t => {
+        const find_type = await TypeList.find(t.id);
         const created_type = await Type.create({
           pokemon_id: pokemon.id,
           type_id: find_type.id
@@ -118,12 +118,6 @@ class PokemonController {
 
       const type_resolved = await Promise.all(type_promises);
 
-      /*     const pokemon_type = await Type.create({
-        pokemon_id: pokemon.id,
-        type_id: find_pokemon_type.id
-      });
-      console.log(find_pokemon_type.id);
-*/
       const pokemon_category_to_send = await pokemon.category().fetch();
       const data = {
         ...pokemon.toJSON(),
@@ -249,16 +243,11 @@ class PokemonController {
   }
 
   async test({ params, request, response }) {
-    const { category } = request.post();
-
-    let test = await Category.findBy("name", category);
-    if (!test) {
-      return "awkwkwwk";
-    } else {
-      return ":>";
-    }
-
-    return response.send(test);
+    const { type } = request.post();
+    console.log(type);
+    return response.send({
+      data: type
+    });
   }
 }
 
