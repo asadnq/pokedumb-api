@@ -9,7 +9,7 @@ class AuthController {
   async register({ auth, request, response }) {
     try {
       const rules = {
-        username: "required|min:6|max:24",
+        username: "required|min:4|max:24",
         email: "required|email|unique:users,email",
         password: "required|min:8|max:30"
       };
@@ -17,9 +17,7 @@ class AuthController {
       const validation = await validate(request.all(), rules);
 
       if (validation.fails()) {
-        return response.json({
-          message: validation.messages()
-        });
+        throw { status: 400, message: validation.messages() };
       } else {
         const { username, email, password } = request.post();
 
@@ -32,7 +30,7 @@ class AuthController {
         });
       }
     } catch (err) {
-      return response.json(err);
+      throw response.json(err);
     }
   }
 
@@ -51,7 +49,7 @@ class AuthController {
         });
       }
     } catch (err) {
-      return response.status(401).json(err);
+      throw response.json(err);
     }
   }
 }

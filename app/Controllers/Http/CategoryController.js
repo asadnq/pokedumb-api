@@ -1,4 +1,4 @@
-'use strict'
+"use strict";
 
 /** @typedef {import('@adonisjs/framework/src/Request')} Request */
 /** @typedef {import('@adonisjs/framework/src/Response')} Response */
@@ -7,6 +7,7 @@
 /**
  * Resourceful controller for interacting with categories
  */
+const Category = use("App/Models/Category");
 class CategoryController {
   /**
    * Show a list of all categories.
@@ -17,7 +18,16 @@ class CategoryController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async index ({ request, response, view }) {
+  async index({ request, response, view }) {
+    try {
+      const categories = await Category.all();
+
+      return response.status(200).json({
+        data: categories
+      });
+    } catch (err) {
+      return response.json(err);
+    }
   }
 
   /**
@@ -29,8 +39,7 @@ class CategoryController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async create ({ request, response, view }) {
-  }
+  async create({ request, response, view }) {}
 
   /**
    * Create/save a new category.
@@ -40,8 +49,7 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async store ({ request, response }) {
-  }
+  async store({ request, response }) {}
 
   /**
    * Display a single category.
@@ -52,8 +60,7 @@ class CategoryController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async show ({ params, request, response, view }) {
-  }
+  async show({ params, request, response, view }) {}
 
   /**
    * Render a form to update an existing category.
@@ -64,8 +71,7 @@ class CategoryController {
    * @param {Response} ctx.response
    * @param {View} ctx.view
    */
-  async edit ({ params, request, response, view }) {
-  }
+  async edit({ params, request, response, view }) {}
 
   /**
    * Update category details.
@@ -75,8 +81,7 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async update ({ params, request, response }) {
-  }
+  async update({ params, request, response }) {}
 
   /**
    * Delete a category with id.
@@ -86,8 +91,7 @@ class CategoryController {
    * @param {Request} ctx.request
    * @param {Response} ctx.response
    */
-  async destroy ({ params, request, response }) {
-  }
+  async destroy({ params, request, response }) {}
 }
 
-module.exports = CategoryController
+module.exports = CategoryController;

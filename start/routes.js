@@ -1,4 +1,4 @@
-'use strict'
+"use strict";
 
 /*
 |--------------------------------------------------------------------------
@@ -14,13 +14,14 @@
 */
 
 /** @type {typeof import('@adonisjs/framework/src/Route/Manager')} */
-const Route = use('Route')
+const Route = use("Route");
 
 Route.group(() => {
-	Route.resource('pokemons', 'PokemonController').apiOnly()
-	Route.resource('types', 'TypeController').apiOnly()
-	Route.post('auth/register', 'AuthController.register')
-	Route.post('auth/login', 'AuthController.login')
-	Route.get('pokemons/search/:q', 'PokemonController.searchPokemon')
-	Route.post('test', 'PokemonController.test')
-}).prefix('api/v1');
+  Route.resource("pokemons", "PokemonController").apiOnly();
+  Route.resource("types", "TypeController").apiOnly();
+  Route.resource("categories", "CategoryController").apiOnly();
+  Route.post("auth/register", "AuthController.register");
+  Route.post("auth/login", "AuthController.login");
+  Route.get("pokemons/search/:q", "PokemonController.searchPokemon");
+  Route.get("test", "PokemonController.test");
+}).prefix("api/v1");
